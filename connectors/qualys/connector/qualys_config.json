@@ -12,5 +12,10 @@
 			"Accept": "application/json",
 			"X-Requested-With": "curl"
 		}
+	},
+	"rate-limit": {
+		"enabled": false,
+		"max-calls": 1,
+		"period": 120
 	}
 }

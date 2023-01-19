@@ -1,10 +1,13 @@
 import json
+import time
+
 import requests
 import xmltodict
 from requests.auth import HTTPBasicAuth
 from car_framework.context import context
 from connector.error_response import ErrorResponder
 from connector.data_handler import epoch_to_datetime_conv, append_vuln_in_asset, deep_get
+from ratelimiter import RateLimiter
 
 
 class AssetServer(object):
@@ -16,8 +19,19 @@ class AssetServer(object):
             self.config = json.load(json_data)
         self.basic_auth = HTTPBasicAuth(context().args.username,
                                         context().args.password)
+        self.counter = 0
+        self.rate_limit_headers = ["X-RateLimit-Limit", "X-RateLimit-Window-Sec", "X-RateLimit-Remaining",
+                                   "X-RateLimit-ToWait-Sec", "X-ConcurrencyLimit-Limit", "X-ConcurrencyLimit-Running"]
+
+        def limited(until):
+            duration = int(round(until - time.time()))
+            print('Rate limited, sleeping for {:d} seconds'.format(duration))
+
+        self.rate_limiter = RateLimiter(max_calls=self.config["rate-limit"]["max-calls"],
+                                        period=self.config["rate-limit"]["period"], callback=limited)
 
     # Pulls asset data for all collection entities
+    @RateLimiter(max_calls=1, period=60)
     def get_collection(self, asset_server_endpoint, headers=None, auth=None, data=None):
         """
         Fetch data from datasource using api
@@ -28,8 +42,17 @@ class AssetServer(object):
             json_data(dict): Api response
         """
         try:
-            resp = requests.post(asset_server_endpoint, headers=headers,
-                                 auth=auth, data=data)
+            self.counter += 1
+            print("accessing server", self.counter, asset_server_endpoint)
+            if self.config["rate-limit"]["enabled"]:
+                with self.rate_limiter:
+                    resp = requests.post(asset_server_endpoint, headers=headers,
+                                         auth=auth, data=data, verify=False)
+            else:
+                resp = requests.post(asset_server_endpoint, headers=headers,
+                                     auth=auth, data=data, verify=False)
+            for s in self.rate_limit_headers:
+                print(s + ": " + str(resp.headers.get(s)))
         except Exception as ex:
             return_obj = {}
             ErrorResponder.fill_error(return_obj, ex)
@@ -148,14 +171,14 @@ class AssetServer(object):
 
         # Get the vulnerability information from knowledgebase
         knowledge_base_vuln_list = self.get_knowledge_base_vuln_list(vuln_list)
-        knowledge_base_vuln_list = {vuln['QID']:vuln for vuln in knowledge_base_vuln_list}
+        knowledge_base_vuln_list = {vuln['QID']: vuln for vuln in knowledge_base_vuln_list}
 
         # Add Knowledge base vuln info to host detection vulnerabilities
         for host_vuln_detection in host_vuln_detections:
             host_vuln_list = deep_get(host_vuln_detection, ['DETECTION_LIST', 'DETECTION'], [])
             if host_vuln_list and not isinstance(host_vuln_list, list):
                 qid = host_vuln_detection['DETECTION_LIST']['DETECTION']['QID']
-                host_vuln_detection['DETECTION_LIST']['DETECTION'][qid]= knowledge_base_vuln_list.get(qid)
+                host_vuln_detection['DETECTION_LIST']['DETECTION'][qid] = knowledge_base_vuln_list.get(qid)
             else:
                 for i in range(0, len(host_vuln_detection['DETECTION_LIST']['DETECTION'])):
                     qid = host_vuln_detection['DETECTION_LIST']['DETECTION'][i]['QID']
@@ -178,7 +201,8 @@ class AssetServer(object):
             ErrorResponder.fill_error(return_obj, error_message.encode('utf'), status_code)
             raise Exception(return_obj)
         response = xmltodict.parse(response.text)
-        knowledge_base_vuln_list = deep_get(response, ['KNOWLEDGE_BASE_VULN_LIST_OUTPUT', 'RESPONSE', 'VULN_LIST', 'VULN'], [])
+        knowledge_base_vuln_list = deep_get(response,
+                                            ['KNOWLEDGE_BASE_VULN_LIST_OUTPUT', 'RESPONSE', 'VULN_LIST', 'VULN'], [])
         if knowledge_base_vuln_list and not isinstance(knowledge_base_vuln_list, list):
             knowledge_base_vuln_list = [knowledge_base_vuln_list]
         return knowledge_base_vuln_list
