@@ -240,7 +240,7 @@ class AssetServer(object):
         data = None
         token = self.get_bearer_token()
         headers = {"Authorization": "Bearer %s" % token}
-        asset_server_endpoint = context().args.gateway + self.config['endpoint']['applications']
+        asset_server_endpoint = context().args.server + self.config['endpoint']['applications']
         if last_model_state_id:
             asset_server_endpoint = asset_server_endpoint + '&assetLastUpdated=%s' % last_model_state_id
         server_endpoint = asset_server_endpoint
