@@ -31,7 +31,6 @@ class AssetServer(object):
                                         period=self.config["rate-limit"]["period"], callback=limited)
 
     # Pulls asset data for all collection entities
-    @RateLimiter(max_calls=1, period=60)
     def get_collection(self, asset_server_endpoint, headers=None, auth=None, data=None):
         """
         Fetch data from datasource using api
@@ -51,8 +50,9 @@ class AssetServer(object):
             else:
                 resp = requests.post(asset_server_endpoint, headers=headers,
                                      auth=auth, data=data, verify=False)
-            for s in self.rate_limit_headers:
-                print(s + ": " + str(resp.headers.get(s)))
+                print("response code", resp.status_code)
+            # for s in self.rate_limit_headers:
+            #     print(s + ": " + str(resp.headers.get(s)))
         except Exception as ex:
             return_obj = {}
             ErrorResponder.fill_error(return_obj, ex)
@@ -95,6 +95,7 @@ class AssetServer(object):
 
             if response_json['ServiceResponse'].get('data'):
                 results = results + response_json['ServiceResponse']['data']
+                return results
 
             # check previous api call response hasMoreRecords
             if response_json['ServiceResponse'].get('hasMoreRecords') and \
@@ -273,6 +274,7 @@ class AssetServer(object):
         host_list = self.get_assets(last_model_state_id)
 
         vuln_list = self.get_vulnerabilities()
-        applications = self.get_applications(last_model_state_id)
+        # applications = self.get_applications(last_model_state_id)
+        applications = []
 
         return append_vuln_in_asset(host_list, vuln_list, applications)

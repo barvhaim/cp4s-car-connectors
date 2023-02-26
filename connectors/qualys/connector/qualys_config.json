@@ -14,8 +14,8 @@
 		}
 	},
 	"rate-limit": {
-		"enabled": true,
-		"max-calls": 1,
-		"period": 120
+		"enabled": false,
+		"max-calls": 60,
+		"period": 1
 	}
 }

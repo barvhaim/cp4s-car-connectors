@@ -26,7 +26,8 @@ class FullImport(BaseFullImport):
                """
         host_list = context().asset_server.get_assets()
         vulnerability_list = context().asset_server.get_vulnerabilities()
-        applications = context().asset_server.get_applications()
+        # applications = context().asset_server.get_applications()
+        applications = []
         return append_vuln_in_asset(host_list, vulnerability_list, applications)
 
     # Logic to import a collection; called by import_vertices
