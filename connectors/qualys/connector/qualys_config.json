@@ -2,7 +2,7 @@
 	"source": "Qualys",
 	"endpoint": {
 		"asset": "/qps/rest/2.0/search/am/hostasset",
-		"asset_vulnerability": "/api/2.0/fo/asset/host/vm/detection/?action=list",
+		"asset_vulnerability": "/api/2.0/fo/asset/host/vm/detection/?action=list&status=Active",
 		"auth": "/auth",
 		"applications" : "/qps/rest/2.0/search/am/asset?pageSize=300&softwareType=Application",
 		"vuln_knowledgebase" : "/api/2.0/fo/knowledge_base/vuln/?action=list"
@@ -11,6 +11,10 @@
 		"headers": {
 			"Accept": "application/json",
 			"X-Requested-With": "curl"
+		},
+		"pagination": {
+			"enabled": true,
+			"page_size": 10
 		}
 	},
 	"rate-limit": {

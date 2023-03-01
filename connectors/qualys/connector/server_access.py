@@ -51,8 +51,8 @@ class AssetServer(object):
                 resp = requests.post(asset_server_endpoint, headers=headers,
                                      auth=auth, data=data, verify=False)
                 print("response code", resp.status_code)
-            # for s in self.rate_limit_headers:
-            #     print(s + ": " + str(resp.headers.get(s)))
+            for s in self.rate_limit_headers:
+                print(s + ": " + str(resp.headers.get(s)))
         except Exception as ex:
             return_obj = {}
             ErrorResponder.fill_error(return_obj, ex)
@@ -69,19 +69,24 @@ class AssetServer(object):
         returns:
             results(list): Api response
         """
-
-        data = None
         results = []
-        pagination = True
+        pagination = self.config['parameter']['pagination']['enabled']
+        page_size = self.config['parameter']['pagination']['page_size']
         headers = self.config['parameter']['headers']
         auth = self.basic_auth
         asset_server_endpoint = context().args.server + self.config['endpoint']['asset']
 
+        # limit number of results
+        data = '<ServiceRequest>' \
+               '<preferences><limitResults>%s</limitResults></preferences>' \
+               '</ServiceRequest>' % page_size
+
         # adding filter for incremental run
         if last_model_state_id:
             data = '<ServiceRequest>' \
+                   '<preferences><limitResults>%s</limitResults></preferences>' \
                    '<filters><Criteria field="updated" operator="GREATER">%s</Criteria></filters>' \
-                   '</ServiceRequest>' % last_model_state_id
+                   '</ServiceRequest>' % (page_size, last_model_state_id)
 
         while pagination:
             response = self.get_collection(asset_server_endpoint, headers=headers, auth=auth, data=data)
@@ -95,7 +100,6 @@ class AssetServer(object):
 
             if response_json['ServiceResponse'].get('data'):
                 results = results + response_json['ServiceResponse']['data']
-                return results
 
             # check previous api call response hasMoreRecords
             if response_json['ServiceResponse'].get('hasMoreRecords') and \
@@ -104,13 +108,15 @@ class AssetServer(object):
                 # adding filter and pagination for incremental run
                 if last_model_state_id:
                     data = '<ServiceRequest>' \
-                           '<preferences><startFromOffset>%s</startFromOffset></preferences>' \
+                           '<preferences><startFromOffset>%s</startFromOffset>' \
+                           '<limitResults>%s</limitResults></preferences>' \
                            '<filters><Criteria field="updated" operator="GREATER">%s</Criteria></filters>' \
-                           '</ServiceRequest>' % (response_json['ServiceResponse']['count'] + 1, last_model_state_id)
+                           '</ServiceRequest>' % (len(results) + 1, page_size, last_model_state_id)
                 else:  # adding filter and pagination for full import
                     data = '<ServiceRequest>' \
-                           '<preferences><startFromOffset>%s</startFromOffset></preferences>' \
-                           '</ServiceRequest>' % (response_json['ServiceResponse']['count'] + 1)
+                           '<preferences><startFromOffset>%s</startFromOffset>' \
+                           '<limitResults>%s</limitResults></preferences>' \
+                           '</ServiceRequest>' % (len(results) + 1, page_size)
             else:
                 pagination = False
 
@@ -124,10 +130,13 @@ class AssetServer(object):
         """
         data = None
         results = []
-        pagination = True
+        pagination = self.config['parameter']['pagination']['enabled']
+        page_size = self.config['parameter']['pagination']['page_size']
         headers = self.config['parameter']['headers']
         auth = self.basic_auth
         server_endpoint = context().args.server + self.config['endpoint']['asset_vulnerability']
+        server_endpoint = server_endpoint + "&truncation_limit=" + str(page_size) if pagination else server_endpoint
+
         while pagination:
             response = self.get_collection(server_endpoint, headers=headers, auth=auth, data=data)
             if response.status_code != 200:
