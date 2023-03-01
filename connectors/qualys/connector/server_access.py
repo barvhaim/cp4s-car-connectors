@@ -212,14 +212,27 @@ class AssetServer(object):
         auth = self.basic_auth
         server_endpoint = context().args.server + self.config['endpoint']['vuln_knowledgebase']
         server_endpoint = server_endpoint + '&ids=' + ','.join(qid_list)
-        response = self.get_collection(server_endpoint, headers=headers, auth=auth)
-        if response.status_code != 200:
-            response = xmltodict.parse(response.text)
-            return_obj = {}
-            status_code = response['SIMPLE_RETURN']['RESPONSE']['CODE']
-            error_message = response['SIMPLE_RETURN']['RESPONSE']['TEXT']
-            ErrorResponder.fill_error(return_obj, error_message.encode('utf'), status_code)
-            raise Exception(return_obj)
+
+        tries = 0
+        response = None
+        while tries < 3:
+            tries += 1
+            response = self.get_collection(server_endpoint, headers=headers, auth=auth)
+            if response.status_code != 200:
+                # retry
+                print("error in response, sleeping for 60 seconds")
+                time.sleep(60)
+                print("retrying, get_knowledge_base_vuln_list - ", str(tries))
+            else:
+                break
+            # response = xmltodict.parse(response.text)
+            # return_obj = {}
+            # status_code = response['SIMPLE_RETURN']['RESPONSE']['CODE']
+            # error_message = response['SIMPLE_RETURN']['RESPONSE']['TEXT']
+            # ErrorResponder.fill_error(return_obj, error_message.encode('utf'), status_code)
+            # raise Exception(return_obj)
+        if not response:
+            return []
         response = xmltodict.parse(response.text)
         knowledge_base_vuln_list = deep_get(response,
                                             ['KNOWLEDGE_BASE_VULN_LIST_OUTPUT', 'RESPONSE', 'VULN_LIST', 'VULN'], [])
