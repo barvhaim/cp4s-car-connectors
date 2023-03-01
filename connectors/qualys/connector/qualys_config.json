@@ -14,7 +14,7 @@
 		},
 		"pagination": {
 			"enabled": true,
-			"page_size": 10
+			"page_size": 100
 		}
 	},
 	"rate-limit": {
