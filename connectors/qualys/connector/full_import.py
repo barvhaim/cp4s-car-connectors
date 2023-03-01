@@ -1,3 +1,5 @@
+import os
+import json
 from connector.data_handler import DataHandler, endpoint_mapping, append_vuln_in_asset
 from car_framework.full_import import BaseFullImport
 from car_framework.context import context
@@ -24,7 +26,13 @@ class FullImport(BaseFullImport):
         returns:
                    List of hosts with vulnerability info
                """
-        host_list = context().asset_server.get_assets()
+        if os.path.exists('host_list.json'):
+            with open('host_list.json') as json_file:
+                host_list = json.load(json_file)
+        else:
+            host_list = context().asset_server.get_assets()
+            with open('host_list.json', 'w') as outfile:
+                json.dump(host_list, outfile)
         vulnerability_list = context().asset_server.get_vulnerabilities()
         # applications = context().asset_server.get_applications()
         applications = []

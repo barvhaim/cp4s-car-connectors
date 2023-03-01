@@ -210,35 +210,38 @@ class AssetServer(object):
         """
         headers = self.config['parameter']['headers']
         auth = self.basic_auth
+        chunk_size = 400
         server_endpoint = context().args.server + self.config['endpoint']['vuln_knowledgebase']
         server_endpoint = server_endpoint + '&ids=' + ','.join(qid_list)
+        results = []
 
-        tries = 0
-        response = None
-        while tries < 3:
-            tries += 1
-            response = self.get_collection(server_endpoint, headers=headers, auth=auth)
-            if response.status_code != 200:
-                # retry
-                print("error in response, sleeping for 60 seconds")
-                time.sleep(60)
-                print("retrying, get_knowledge_base_vuln_list - ", str(tries))
-            else:
-                break
-            # response = xmltodict.parse(response.text)
-            # return_obj = {}
-            # status_code = response['SIMPLE_RETURN']['RESPONSE']['CODE']
-            # error_message = response['SIMPLE_RETURN']['RESPONSE']['TEXT']
-            # ErrorResponder.fill_error(return_obj, error_message.encode('utf'), status_code)
-            # raise Exception(return_obj)
-        if not response:
-            return []
-        response = xmltodict.parse(response.text)
-        knowledge_base_vuln_list = deep_get(response,
+        for i in range(0, len(qid_list), chunk_size):
+            chunk_server_endpoint = server_endpoint + '&ids=' + ','.join(qid_list[i:i + chunk_size])
+            print("chunk_server_endpoint = ", chunk_server_endpoint)
+
+            tries = 0
+            while tries < 3:
+                tries += 1
+                try:
+                    response = self.get_collection(server_endpoint, headers=headers, auth=auth)
+                    if response.status_code != 200:
+                        print("error in response, sleeping for 60 seconds")
+                        time.sleep(60)
+                        print("retrying, get_knowledge_base_vuln_list - ", str(tries))
+                    else:
+                        response = xmltodict.parse(response.text)
+                        knowledge_base_vuln_list = deep_get(response,
                                             ['KNOWLEDGE_BASE_VULN_LIST_OUTPUT', 'RESPONSE', 'VULN_LIST', 'VULN'], [])
-        if knowledge_base_vuln_list and not isinstance(knowledge_base_vuln_list, list):
-            knowledge_base_vuln_list = [knowledge_base_vuln_list]
-        return knowledge_base_vuln_list
+                        if knowledge_base_vuln_list and not isinstance(knowledge_base_vuln_list, list):
+                            knowledge_base_vuln_list = [knowledge_base_vuln_list]
+                        results = results + knowledge_base_vuln_list
+                        break
+                except Exception as e:
+                    print("Exception in get_knowledge_base_vuln_list = ", e)
+                    time.sleep(60)
+                    print("retrying, get_knowledge_base_vuln_list - ", str(tries))
+        return results
+
 
     def get_bearer_token(self):
         """
