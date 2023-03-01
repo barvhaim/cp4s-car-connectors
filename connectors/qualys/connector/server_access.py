@@ -208,6 +208,7 @@ class AssetServer(object):
         """
         Get QID associated CVE and general information from Qualys knowledgebase
         """
+        qid_list = list(qid_list)
         headers = self.config['parameter']['headers']
         auth = self.basic_auth
         chunk_size = 400
