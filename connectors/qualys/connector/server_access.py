@@ -92,11 +92,16 @@ class AssetServer(object):
             response = self.get_collection(asset_server_endpoint, headers=headers, auth=auth, data=data)
             response_json = response.json()
             if response.status_code != 200 or response_json['ServiceResponse']['responseCode'] != 'SUCCESS':
-                return_obj, error_msg = {}, {}
-                status_code = response_json['ServiceResponse']['responseCode']
-                error_msg['message'] = response_json['ServiceResponse']['responseErrorDetails']
-                ErrorResponder.fill_error(return_obj, json.dumps(error_msg).encode(), status_code)
-                raise Exception(return_obj)
+                # retry
+                print("error in response, sleeping for 60 seconds")
+                time.sleep(60)
+                print("retrying")
+                continue
+                # return_obj, error_msg = {}, {}
+                # status_code = response_json['ServiceResponse']['responseCode']
+                # error_msg['message'] = response_json['ServiceResponse']['responseErrorDetails']
+                # ErrorResponder.fill_error(return_obj, json.dumps(error_msg).encode(), status_code)
+                # raise Exception(return_obj)
 
             if response_json['ServiceResponse'].get('data'):
                 results = results + response_json['ServiceResponse']['data']
@@ -140,12 +145,17 @@ class AssetServer(object):
         while pagination:
             response = self.get_collection(server_endpoint, headers=headers, auth=auth, data=data)
             if response.status_code != 200:
-                response = xmltodict.parse(response.text)
-                return_obj = {}
-                status_code = response['SIMPLE_RETURN']['RESPONSE']['CODE']
-                error_message = response['SIMPLE_RETURN']['RESPONSE']['TEXT']
-                ErrorResponder.fill_error(return_obj, error_message.encode('utf'), status_code)
-                raise Exception(return_obj)
+                # retry
+                print("error in response, sleeping for 60 seconds")
+                time.sleep(60)
+                print("retrying")
+                continue
+                # response = xmltodict.parse(response.text)
+                # return_obj = {}
+                # status_code = response['SIMPLE_RETURN']['RESPONSE']['CODE']
+                # error_message = response['SIMPLE_RETURN']['RESPONSE']['TEXT']
+                # ErrorResponder.fill_error(return_obj, error_message.encode('utf'), status_code)
+                # raise Exception(return_obj)
             response = xmltodict.parse(response.text)
 
             if response['HOST_LIST_VM_DETECTION_OUTPUT']['RESPONSE'].get('HOST_LIST'):
