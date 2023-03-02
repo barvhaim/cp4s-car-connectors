@@ -211,12 +211,13 @@ class AssetServer(object):
         qid_list = list(qid_list)
         headers = self.config['parameter']['headers']
         auth = self.basic_auth
-        chunk_size = 400
+        chunk_size = 100
         server_endpoint = context().args.server + self.config['endpoint']['vuln_knowledgebase']
         server_endpoint = server_endpoint + '&ids=' + ','.join(qid_list)
         results = []
 
         for i in range(0, len(qid_list), chunk_size):
+            time.sleep(60)
             chunk_server_endpoint = server_endpoint + '&ids=' + ','.join(qid_list[i:i + chunk_size])
             print("chunk_server_endpoint = ", chunk_server_endpoint)
 
