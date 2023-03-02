@@ -1,5 +1,6 @@
 import json
 import time
+import os
 
 import requests
 import xmltodict
@@ -42,7 +43,7 @@ class AssetServer(object):
         """
         try:
             self.counter += 1
-            print("accessing server", self.counter, asset_server_endpoint)
+            print("accessing server", self.counter, asset_server_endpoint[:100])
             if self.config["rate-limit"]["enabled"]:
                 with self.rate_limiter:
                     resp = requests.post(asset_server_endpoint, headers=headers,
@@ -142,34 +143,39 @@ class AssetServer(object):
         server_endpoint = context().args.server + self.config['endpoint']['asset_vulnerability']
         server_endpoint = server_endpoint + "&truncation_limit=" + str(page_size) if pagination else server_endpoint
 
-        while pagination:
-            response = self.get_collection(server_endpoint, headers=headers, auth=auth, data=data)
-            if response.status_code != 200:
-                # retry
-                print("error in response, sleeping for 60 seconds")
-                time.sleep(60)
-                print("retrying")
-                continue
-                # response = xmltodict.parse(response.text)
-                # return_obj = {}
-                # status_code = response['SIMPLE_RETURN']['RESPONSE']['CODE']
-                # error_message = response['SIMPLE_RETURN']['RESPONSE']['TEXT']
-                # ErrorResponder.fill_error(return_obj, error_message.encode('utf'), status_code)
-                # raise Exception(return_obj)
-            response = xmltodict.parse(response.text)
+        if os.path.exists('vuln_list.json'):
+            with open('vuln_list.json') as f:
+                results = json.load(f)
+        else:
+            while pagination:
+                response = self.get_collection(server_endpoint, headers=headers, auth=auth, data=data)
+                if response.status_code != 200:
+                    # retry
+                    print("error in response, sleeping for 60 seconds")
+                    time.sleep(60)
+                    print("retrying")
+                    continue
+                    # response = xmltodict.parse(response.text)
+                    # return_obj = {}
+                    # status_code = response['SIMPLE_RETURN']['RESPONSE']['CODE']
+                    # error_message = response['SIMPLE_RETURN']['RESPONSE']['TEXT']
+                    # ErrorResponder.fill_error(return_obj, error_message.encode('utf'), status_code)
+                    # raise Exception(return_obj)
+                response = xmltodict.parse(response.text)
 
-            if response['HOST_LIST_VM_DETECTION_OUTPUT']['RESPONSE'].get('HOST_LIST'):
-                if isinstance(response['HOST_LIST_VM_DETECTION_OUTPUT']['RESPONSE']['HOST_LIST']['HOST'], list):
-                    results = results + response['HOST_LIST_VM_DETECTION_OUTPUT']['RESPONSE']['HOST_LIST']['HOST']
+                if response['HOST_LIST_VM_DETECTION_OUTPUT']['RESPONSE'].get('HOST_LIST'):
+                    if isinstance(response['HOST_LIST_VM_DETECTION_OUTPUT']['RESPONSE']['HOST_LIST']['HOST'], list):
+                        results = results + response['HOST_LIST_VM_DETECTION_OUTPUT']['RESPONSE']['HOST_LIST']['HOST']
+                    else:
+                        temp = []
+                        temp.append(response['HOST_LIST_VM_DETECTION_OUTPUT']['RESPONSE']['HOST_LIST']['HOST'])
+                        results = results + temp
+                # check the response has more records, will use the link.
+                if 'WARNING' in response['HOST_LIST_VM_DETECTION_OUTPUT']['RESPONSE']:
+                    server_endpoint = response['HOST_LIST_VM_DETECTION_OUTPUT']['RESPONSE']['WARNING']['URL']
                 else:
-                    temp = []
-                    temp.append(response['HOST_LIST_VM_DETECTION_OUTPUT']['RESPONSE']['HOST_LIST']['HOST'])
-                    results = results + temp
-            # check the response has more records, will use the link.
-            if 'WARNING' in response['HOST_LIST_VM_DETECTION_OUTPUT']['RESPONSE']:
-                server_endpoint = response['HOST_LIST_VM_DETECTION_OUTPUT']['RESPONSE']['WARNING']['URL']
-            else:
-                pagination = False
+                    pagination = False
+
         # Update host vulnerability detections with vulnerability knowledgebase information
         if results:
             self.add_vuln_kb_info(results)
@@ -211,7 +217,7 @@ class AssetServer(object):
         qid_list = list(qid_list)
         headers = self.config['parameter']['headers']
         auth = self.basic_auth
-        chunk_size = 100
+        chunk_size = 400
         server_endpoint = context().args.server + self.config['endpoint']['vuln_knowledgebase']
         server_endpoint = server_endpoint + '&ids=' + ','.join(qid_list)
         results = []
@@ -219,13 +225,12 @@ class AssetServer(object):
         for i in range(0, len(qid_list), chunk_size):
             time.sleep(60)
             chunk_server_endpoint = server_endpoint + '&ids=' + ','.join(qid_list[i:i + chunk_size])
-            print("chunk_server_endpoint = ", chunk_server_endpoint)
 
             tries = 0
             while tries < 3:
                 tries += 1
                 try:
-                    response = self.get_collection(server_endpoint, headers=headers, auth=auth)
+                    response = self.get_collection(chunk_server_endpoint, headers=headers, auth=auth)
                     if response.status_code != 200:
                         print("error in response, sleeping for 60 seconds")
                         time.sleep(60)
