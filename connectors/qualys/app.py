@@ -29,7 +29,7 @@ def no_ssl_verification():
         # Verification happens only once per connection so we need to close
         # all the opened adapters once we're done. Otherwise, the effects of
         # verify=False persist beyond the end of this context manager.
-        print("accessing url", url)
+        print("accessing url", url[:100])
         opened_adapters.add(self.get_adapter(url))
 
         settings = old_merge_environment_settings(self, url, proxies, stream, verify, cert)

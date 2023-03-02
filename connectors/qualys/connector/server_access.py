@@ -176,6 +176,9 @@ class AssetServer(object):
                 else:
                     pagination = False
 
+            with open('vuln_list.json', 'w') as f:
+                json.dump(results, f)
+
         # Update host vulnerability detections with vulnerability knowledgebase information
         if results:
             self.add_vuln_kb_info(results)
@@ -219,7 +222,6 @@ class AssetServer(object):
         auth = self.basic_auth
         chunk_size = 400
         server_endpoint = context().args.server + self.config['endpoint']['vuln_knowledgebase']
-        server_endpoint = server_endpoint + '&ids=' + ','.join(qid_list)
         results = []
 
         for i in range(0, len(qid_list), chunk_size):
